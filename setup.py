@@ -4,8 +4,8 @@ setup(
     name="ms-dataverse",
     version="0.1.0",
     description="DataverseORM is a Python module that simplifies working with Microsoft Dataverse by providing a lightweight Object-Relational Mapper (ORM) for querying, creating, updating, and deleting entities. It uses the Dataverse Web API for communication and includes optional metadata validation to ensure that entities and properties exist in the connected Dataverse environment.",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="Denniz Svens",
+    author_email="denniz@liminity.se",
     url="https://github.com/yourusername/yourrepository",
     packages=find_packages(),
     classifiers=[
