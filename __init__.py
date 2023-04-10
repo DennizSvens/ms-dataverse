@@ -8,7 +8,7 @@ class DataverseError(Exception):
         self.response = response
 
 class DataverseORM:
-    def __init__(self, dynamics_url, access_token, metadata_validation=False):
+    def __init__(self, dynamics_url, access_token, metadata_validation=False, refresh_token_callback=None):
         self.dynamics_url = dynamics_url
         self.headers = {
             "Authorization": f"Bearer {access_token}",
@@ -22,7 +22,15 @@ class DataverseORM:
         self._entity_cache = {}
         if metadata_validation:
             self.fetch_metadata()
+        self.refresh_token_callback = refresh_token_callback
 
+    def handle_token_expiration_error(self, error):
+        if error.response.status_code == 401 and self.refresh_token_callback:
+            # Refresh the access token
+            new_access_token = self.refresh_token_callback()
+            self.access_token(new_access_token)
+            return True
+        return False
     def fetch_metadata(self):
         metadata_url = f"{self.base_url}$metadata"
         headers = self.headers.copy()
@@ -44,22 +52,22 @@ class Entity:
     def __init__(self, orm, entity_name):
         self.orm = orm
         self.entity_name = entity_name
-        if orm.metadata_validation:
-            self.entity_set, self.entity_type_element = self._validate_entity()
+        # if orm.metadata_validation:
+        #     self.entity_set, self.entity_type_element = self._validate_entity()
 
-    def _validate_entity(self):
-      entity_set = self.orm.metadata.find(f".//EntitySet[@Name='{self.entity_name}']")
-      if entity_set is None:
-          raise DataverseError(f"Entity '{self.entity_name}' not found in the metadata.")
-      entity_type = entity_set.get("EntityType").split(".")[-1]
-      entity_type_element = self.orm.metadata.find(f".//EntityType[@Name='{entity_type}']")
-      return entity_set, entity_type_element
+    # def _validate_entity(self):
+    #   entity_set = self.orm.metadata.find(f".//EntitySet[@Name='{self.entity_name}']")
+    #   if entity_set is None:
+    #       raise DataverseError(f"Entity '{self.entity_name}' not found in the metadata.")
+    #   entity_type = entity_set.get("EntityType").split(".")[-1]
+    #   entity_type_element = self.orm.metadata.find(f".//EntityType[@Name='{entity_type}']")
+    #   return entity_set, entity_type_element
 
-    def _validate_properties(self, entity_data):
-        for property_name in entity_data.keys():
-            property_element = self.entity_type_element.find(f".//Property[@Name='{property_name}']")
-            if property_element is None:
-                raise DataverseError(f"Property '{property_name}' not found in entity '{self.entity_name}' in the metadata.")
+    # def _validate_properties(self, entity_data):
+    #     for property_name in entity_data.keys():
+    #         property_element = self.entity_type_element.find(f".//Property[@Name='{property_name}']")
+    #         if property_element is None:
+    #             raise DataverseError(f"Property '{property_name}' not found in entity '{self.entity_name}' in the metadata.")
 
     def get(self, entity_id):
         url = f"{self.orm.base_url}{self.entity_name}({entity_id})"
@@ -68,16 +76,21 @@ class Entity:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            raise DataverseError(f"Error getting entity: {e}", response=e.response)
+                if self.orm.handle_token_expiration_error(e):
+                    return self.get(entity_id)
+                else:
+                    raise DataverseError(f"Error getting entity: {e}", response=e.response)
 
     def create(self, entity_data):
-        self._validate_properties(entity_data)
+        # self._validate_properties(entity_data)
         url = f"{self.orm.base_url}{self.entity_name}"
         try:
             response = requests.post(url, headers=self.orm.headers, json=entity_data)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
+            if self.orm.handle_token_expiration_error(e):
+                return self.create(entity_data)
             raise DataverseError(f"Error creating entity: {e}", response=e.response)
 
     def update(self, entity_id, entity_data):
@@ -87,6 +100,8 @@ class Entity:
             response.raise_for_status()
             return response.status_code == 204
         except requests.exceptions.RequestException as e:
+            if self.orm.handle_token_expiration_error(e):
+                return self.update(entity_id, entity_data)
             raise DataverseError(f"Error updating entity: {e}", response=e.response)
 
     def delete(self, entity_id):
@@ -96,6 +111,8 @@ class Entity:
             response.raise_for_status()
             return response.status_code == 204
         except requests.exceptions.RequestException as e:
+            if(self.orm.handle_token_expiration_error(e)):
+                return self.delete(entity_id)
             raise DataverseError(f"Error deleting entity: {e}", response=e.response)
 
     def query(self, filter_expression=None, select_fields=None, order_by=None):
@@ -114,4 +131,6 @@ class Entity:
             response.raise_for_status()
             return response.json()["value"]
         except requests.exceptions.RequestException as e:
+            if(self.orm.handle_token_expiration_error(e)):
+                return self.query(filter_expression, select_fields, order_by)
             raise DataverseError(f"Error querying entity: {e}", response=e.response)
