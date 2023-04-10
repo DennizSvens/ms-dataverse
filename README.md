@@ -1,5 +1,5 @@
 # DataverseORM
-DataverseORM is a Python module that simplifies working with Microsoft Dataverse by providing a lightweight Object-Relational Mapper (ORM) for querying, creating, updating, and deleting entities. It uses the Dataverse Web API for communication and includes optional metadata validation to ensure that entities and properties exist in the connected Dataverse environment.
+DataverseORM is a Python module that simplifies working with Microsoft Dataverse by providing a lightweight Object-Relational Mapper (ORM) for querying, creating, updating, and deleting entities. It uses the Dataverse Web API for communication. 
 
 ## Installation
 ```
@@ -30,14 +30,20 @@ https://github.com/AzureAD/microsoft-authentication-library-for-python
 Both `PublicClientApplication` and `ConfidentialClientApplication` classes work effectively with this package and the Dataverse Web API.
 
 
-## Fetching metadata
-If you want to enable metadata validation (recommended during development), pass metadata_validation=True when creating an instance of DataverseORM:
+## Refresh token callback
+The refresh_token_callback parameter is an optional function that you can provide to handle token expiration. When the access token expires, the callback function will be called automatically to refresh the token. The callback function should return a new access token. To use the refresh_token_callback, pass it when creating an instance of DataverseORM:
 
 ``` python
-orm = DataverseORM(dynamics_url="https://your_environment.crm.dynamics.com", access_token="your_access_token", metadata_validation=True)
+
+def refresh_access_token():
+    # Your token refresh logic here
+    return new_access_token
+
+orm = DataverseORM(dynamics_url="https://your_environment.crm.dynamics.com", access_token="your_access_token", refresh_token_callback=refresh_access_token)
+
 ```
 
-Metadata validation verifies the existence of entities and properties prior to issuing API requests, which results in improved error handling and messaging.
+By providing a refresh_token_callback, you can ensure seamless operation of the DataverseORM instance, even when the access token expires during its usage.
 
 ## Working with entities
 To work with a specific entity, get an instance of the Entity class:

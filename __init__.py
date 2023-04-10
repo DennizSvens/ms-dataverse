@@ -8,7 +8,7 @@ class DataverseError(Exception):
         self.response = response
 
 class DataverseORM:
-    def __init__(self, dynamics_url, access_token, metadata_validation=False, refresh_token_callback=None):
+    def __init__(self, dynamics_url, access_token, refresh_token_callback=None):
         self.dynamics_url = dynamics_url
         self.headers = {
             "Authorization": f"Bearer {access_token}",
@@ -20,8 +20,6 @@ class DataverseORM:
         self.base_url = f"{dynamics_url}/api/data/v9.2/"
         self.metadata_validation = metadata_validation
         self._entity_cache = {}
-        if metadata_validation:
-            self.fetch_metadata()
         self.refresh_token_callback = refresh_token_callback
 
     def handle_token_expiration_error(self, error):
@@ -31,17 +29,6 @@ class DataverseORM:
             self.access_token(new_access_token)
             return True
         return False
-    def fetch_metadata(self):
-        metadata_url = f"{self.base_url}$metadata"
-        headers = self.headers.copy()
-        headers["Accept"] = "application/xml"
-        try:
-            response = requests.get(metadata_url, headers=headers)
-            response.raise_for_status()
-            metadata_xml = response.text
-            self.metadata = ET.fromstring(metadata_xml)
-        except requests.exceptions.RequestException as e:
-            raise DataverseError(f"Error fetching metadata: {e}", response=e.response)
 
     def entity(self, entity_name):
         if entity_name not in self._entity_cache:
@@ -55,19 +42,6 @@ class Entity:
         # if orm.metadata_validation:
         #     self.entity_set, self.entity_type_element = self._validate_entity()
 
-    # def _validate_entity(self):
-    #   entity_set = self.orm.metadata.find(f".//EntitySet[@Name='{self.entity_name}']")
-    #   if entity_set is None:
-    #       raise DataverseError(f"Entity '{self.entity_name}' not found in the metadata.")
-    #   entity_type = entity_set.get("EntityType").split(".")[-1]
-    #   entity_type_element = self.orm.metadata.find(f".//EntityType[@Name='{entity_type}']")
-    #   return entity_set, entity_type_element
-
-    # def _validate_properties(self, entity_data):
-    #     for property_name in entity_data.keys():
-    #         property_element = self.entity_type_element.find(f".//Property[@Name='{property_name}']")
-    #         if property_element is None:
-    #             raise DataverseError(f"Property '{property_name}' not found in entity '{self.entity_name}' in the metadata.")
 
     def get(self, entity_id):
         url = f"{self.orm.base_url}{self.entity_name}({entity_id})"
